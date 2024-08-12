@@ -4,7 +4,7 @@ type LogRecordType = byte
 
 const (
 	LogRecordNormal LogRecordType = iota
-	LogRecordDelete
+	LogRecordDeleted
 )
 
 // LogRecord 寫入到數據文檔的記錄

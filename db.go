@@ -42,6 +42,48 @@ func (db *DB) Put(key []byte, value []byte) error {
 	return nil
 }
 
+func (db *DB) Get(key []byte) ([]byte, error) {
+
+	// 因為是讀操作，所以用 RLock
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	// 判斷 key 有效
+	if len(key) == 0 {
+		return nil, ErrKeyIsEmpty
+	}
+
+	// 從內存數據結構中取出 key 對應的索引信息
+	pos := db.index.Get(key)
+	// 如果索引信息不存在，說明 key 不在數據庫中
+	if pos == nil {
+		return nil, ErrKeyNotFound
+	}
+
+	// 根據文檔 id 找到對應的數據文檔
+	var file *data.DataFile
+	if db.activeFile.FileId == pos.Fid {
+		file = db.activeFile
+	} else {
+		file = db.olderFiles[pos.Fid]
+	}
+
+	// 數據文件為空
+	if file == nil {
+		return nil, ErrDataFileNotFound
+	}
+
+	// 根據 offset 讀取對應的數據
+	record, err := file.ReadLogRecord(pos.Offset)
+	if err != nil {
+		return nil, err
+	}
+	if record.Type == data.LogRecordDeleted {
+		return nil, ErrKeyNotFound
+	}
+	return record.Value, nil
+}
+
 // appendLogRecord 追加寫數據到活躍文檔中
 func (db *DB) appendLogRecord(record *data.LogRecord) (*data.LogRecordPos, error) {
 	db.mu.Lock()
