@@ -44,14 +44,17 @@ func TestFileIO_Read(t *testing.T) {
 
 	assert.NotNil(t, fio)
 
+	// Write data to the file
 	_, err = fio.Write([]byte("key-a"))
 	assert.Nil(t, err)
 	_, err = fio.Write([]byte("key-b"))
 	assert.Nil(t, err)
 
-	b1 := make([]byte, 5)
-	n, err := fio.Read(b1, 0)
+	// Create a buffer to read data into
+	buf := make([]byte, 5)
+	n, err := fio.Read(buf, 0)
+	assert.Nil(t, err)
 	assert.Equal(t, 5, n)
-	assert.Equal(t, []byte("key-a"), b1)
+	assert.Equal(t, []byte("key-a"), buf)
 
 }

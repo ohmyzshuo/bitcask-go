@@ -4,6 +4,8 @@ import (
 	"bitcask-go/fio"
 )
 
+const DataFileNameSuffix = ".data"
+
 // DataFile 數據文檔
 type DataFile struct {
 	FileId      uint32        // 文檔 id
@@ -15,8 +17,8 @@ func OpenDataFile(dirPath string, fileId uint32) (*DataFile, error) {
 	return nil, nil
 }
 
-func (file *DataFile) ReadLogRecord(offset int64) (*LogRecord, error) {
-	return nil, nil
+func (file *DataFile) ReadLogRecord(offset int64) (*LogRecord, int64, error) {
+	return nil, 0, nil
 }
 func (file *DataFile) Sync() error {
 	return nil

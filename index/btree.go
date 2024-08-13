@@ -42,7 +42,7 @@ func (bt *BTree) Delete(key []byte) bool {
 		key: key,
 	}
 	bt.lock.Lock()
-	oldItem := bt.tree.Delete(it) // 返回的是刪除的那個值
+	oldItem := bt.tree.Delete(it) // 右側返回的是刪除的那個值
 	bt.lock.Unlock()
 	if oldItem == nil {
 		return false

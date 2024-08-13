@@ -3,8 +3,9 @@ package bitcask_go
 import "errors"
 
 var (
-	ErrKeyIsEmpty        = errors.New("The key is empty")
-	ErrIndexUpdateFailed = errors.New("Failed to update index")
-	ErrKeyNotFound       = errors.New("Key is not found in the database")
-	ErrDataFileNotFound  = errors.New("Data file is not found")
+	ErrKeyIsEmpty             = errors.New("the key is empty")
+	ErrIndexUpdateFailed      = errors.New("failed to update index")
+	ErrKeyNotFound            = errors.New("key is not found in the database")
+	ErrDataFileNotFound       = errors.New("data file is not found")
+	ErrDataDirectoryCorrupted = errors.New("database directory may be corrupted")
 )

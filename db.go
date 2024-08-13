@@ -3,16 +3,57 @@ package bitcask_go
 import (
 	"bitcask-go/data"
 	"bitcask-go/index"
+	"errors"
+	"io"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
 	"sync"
 )
 
 // DB bitcask 數據引擎實例
 type DB struct {
-	options    Options
-	mu         *sync.RWMutex
+	options    Options                   // 用戶配置項
+	mu         *sync.RWMutex             // 讀寫互斥鎖
 	activeFile *data.DataFile            // 當前活躍數據文檔，可以用於寫入
 	olderFiles map[uint32]*data.DataFile // 舊的數據文檔，只讀
 	index      index.Indexer             // 內存索引
+	fileIds    []int                     // 文件 ID， 只能在加載索引時使用，其他情況禁止
+}
+
+// Open 開啟數據庫
+func Open(options Options) (*DB, error) {
+	// 對用戶傳入的配置項進行校驗
+	if err := checkOptions(options); err != nil {
+		return nil, err
+	}
+
+	// 判斷數據目錄是否存在，若不存在則創建
+
+	if _, err := os.Stat(options.DirPath); os.IsNotExist(err) {
+		if err := os.MkdirAll(options.DirPath, os.ModePerm); err != nil {
+			return nil, err
+		}
+	}
+
+	// 初始化 DB 實例結構體
+	db := &DB{
+		options:    options,
+		mu:         new(sync.RWMutex),
+		olderFiles: make(map[uint32]*data.DataFile),
+		index:      index.NewIndexer(options.indexType),
+	}
+
+	// 加載對應的數據文檔
+	if err := db.loadDataFiles(); err != nil {
+		return nil, err
+	}
+	// 從數據文件中加載索引
+	if err := db.loadDataFiles(); err != nil {
+		return nil, err
+	}
+	return db, nil
 }
 
 // Put 寫入 key-value 數據 (key 非空)
@@ -74,7 +115,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	}
 
 	// 根據 offset 讀取對應的數據
-	record, err := file.ReadLogRecord(pos.Offset)
+	record, _, err := file.ReadLogRecord(pos.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +178,7 @@ func (db *DB) appendLogRecord(record *data.LogRecord) (*data.LogRecordPos, error
 	return pos, nil
 }
 
-// 設置當前活躍文檔
+// setActiveDataFile 設置當前活躍文檔
 // 在訪問此方法前必須持有互斥鎖
 func (db *DB) setActiveDataFile() error {
 	var initialFileId uint32 = 0
@@ -153,5 +194,106 @@ func (db *DB) setActiveDataFile() error {
 
 	db.activeFile = dataFile
 
+	return nil
+}
+
+// 從磁盤中加載數據到文檔
+func (db *DB) loadDataFiles() error {
+	// 讀取目錄
+	dirEntries, err := os.ReadDir(db.options.DirPath)
+	if err != nil {
+		return err
+	}
+	var fileIds []int
+
+	for _, entry := range dirEntries {
+		if strings.HasSuffix(entry.Name(), data.DataFileNameSuffix) {
+			// 分割取 . 前面的 如 1351.data 取 1351
+			splitNames := strings.Split(entry.Name(), ".")
+			fileId, err := strconv.Atoi(splitNames[0])
+			// 數據目錄有可能損壞
+			if err != nil {
+				return ErrDataDirectoryCorrupted
+			}
+			fileIds = append(fileIds, fileId)
+		}
+	}
+	// 對文件 ID 進行排序，從小到大依次加載
+	sort.Ints(fileIds)
+
+	db.fileIds = fileIds
+
+	// 遍歷每個文件 ID， 打開對應檔數據文件
+	for i, fid := range fileIds {
+		file, err := data.OpenDataFile(db.options.DirPath, uint32(fid))
+		if err != nil {
+			return err
+		}
+
+		if i == len(fileIds)-1 {
+			// 最後一個， ID 是最大檔，說明是當前活躍文件
+			db.activeFile = file
+		} else {
+			// 說明是舊的數據文件
+			db.olderFiles[uint32(fid)] = file
+		}
+	}
+	return nil
+}
+
+// loadIndexFromDataFiles 從數據文件中加載索引
+// 遍歷文件中所有的記錄，並更新到內存索引中
+func (db *DB) loadIndexFromDataFiles() error {
+	// 沒有文件，說明數據庫是空的，直接返回
+	if len(db.fileIds) == 0 {
+		return nil
+	}
+	// 遍歷所有的文件 ID，處理文件中的記錄
+	for i, fid := range db.fileIds {
+		var fileId = uint32(fid)
+		var file *data.DataFile
+		if fileId == db.activeFile.FileId {
+			file = db.activeFile
+		} else {
+			file = db.olderFiles[fileId]
+		}
+		var offset int64 = 0
+		for {
+			record, size, err := file.ReadLogRecord(offset)
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				return err
+			}
+
+			// 構造內存索引並保存
+			pos := &data.LogRecordPos{
+				Fid:    fileId,
+				Offset: offset,
+			}
+			if record.Type == data.LogRecordDeleted {
+				db.index.Delete(record.Key)
+			} else {
+				db.index.Put(record.Key, pos)
+			}
+			// 遞增 offset，下一次從新的位置讀取
+			offset += size
+		}
+		// 如果是最後一個文件，即當前活躍文件，更新這個文件的 WriteOffset
+		if i == len(db.fileIds)-1 {
+			db.activeFile.WriteOffset = offset
+		}
+	}
+	return nil
+}
+
+func checkOptions(options Options) error {
+	if options.DirPath == "" {
+		return errors.New("database directory path is invalid")
+	}
+	if options.DataFileSize == 0 {
+		return errors.New("data file size must be greater than 0")
+	}
 	return nil
 }
