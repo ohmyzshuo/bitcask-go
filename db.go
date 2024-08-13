@@ -30,7 +30,6 @@ func Open(options Options) (*DB, error) {
 	}
 
 	// 判斷數據目錄是否存在，若不存在則創建
-
 	if _, err := os.Stat(options.DirPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(options.DirPath, os.ModePerm); err != nil {
 			return nil, err
@@ -123,6 +122,29 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 		return nil, ErrKeyNotFound
 	}
 	return record.Value, nil
+}
+
+func (db *DB) Delete(key []byte) error {
+	if len(key) == 0 {
+		return ErrKeyIsEmpty
+	}
+	// 先檢查 key 是否存在，如果不存在直接返回
+	if pos := db.index.Get(key); pos == nil {
+		return nil
+	}
+	// 構造 LogRecord，標示其是被刪除的
+	record := &data.LogRecord{Key: key, Type: data.LogRecordDeleted}
+	// 寫入到數據文件中
+	_, err := db.appendLogRecord(record)
+	if err != nil {
+		return err
+	}
+
+	ok := db.index.Delete(key)
+	if !ok {
+		return ErrIndexUpdateFailed
+	}
+	return nil
 }
 
 // appendLogRecord 追加寫數據到活躍文檔中
@@ -272,10 +294,14 @@ func (db *DB) loadIndexFromDataFiles() error {
 				Fid:    fileId,
 				Offset: offset,
 			}
+			var ok bool
 			if record.Type == data.LogRecordDeleted {
-				db.index.Delete(record.Key)
+				ok = db.index.Delete(record.Key)
 			} else {
-				db.index.Put(record.Key, pos)
+				ok = db.index.Put(record.Key, pos)
+			}
+			if !ok {
+				return ErrIndexUpdateFailed
 			}
 			// 遞增 offset，下一次從新的位置讀取
 			offset += size
