@@ -43,7 +43,7 @@ func EncodeLogRecord(record *LogRecord) ([]byte, int64) {
 	// 初始化一個 header 部分的字節數組
 	header := make([]byte, maxLogRecordHeaderSize)
 
-	// 在第五個字節出存醋 Type
+	// 在第五個字節儲存 Type
 	header[4] = record.Type
 	var index = 5
 	// 第五個字節後，存儲的是 key 和 value 的長度信息
@@ -59,9 +59,9 @@ func EncodeLogRecord(record *LogRecord) ([]byte, int64) {
 	copy(encodedBytes[:index], header[:index])
 
 	// 將 Key 和 Value 數據拷貝到字節數組中
-
 	copy(encodedBytes[index:], record.Key)
-	copy(encodedBytes[index+len(record.Key):], record.Value)
+	index += len(record.Key)
+	copy(encodedBytes[index:], record.Value)
 
 	// 對整個 LogRecord 的數據進行 crc 校驗
 	// 校驗的內容從第 5 個字節開始
