@@ -13,7 +13,7 @@ var (
 	ErrInValidCRC = errors.New("invalid crc value, log record may be corrupted")
 )
 
-const DataFileNameSuffix = ".data"
+const FileNameSuffix = ".data"
 
 // DataFile 數據文件
 type DataFile struct {
@@ -25,7 +25,7 @@ type DataFile struct {
 // OpenDataFile 打開新的數據文件
 func OpenDataFile(dirPath string, fileId uint32) (*DataFile, error) {
 	// 拼出有路徑的文件名
-	fileName := filepath.Join(dirPath, fmt.Sprintf("%09d", fileId)+DataFileNameSuffix)
+	fileName := filepath.Join(dirPath, fmt.Sprintf("%09d", fileId)+FileNameSuffix)
 	// 初始化 IOManager 接口
 	ioManager, err := fio.NewIOManager(fileName)
 

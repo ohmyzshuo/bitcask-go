@@ -229,7 +229,7 @@ func (db *DB) loadDataFiles() error {
 	var fileIds []int
 
 	for _, entry := range dirEntries {
-		if strings.HasSuffix(entry.Name(), data.DataFileNameSuffix) {
+		if strings.HasSuffix(entry.Name(), data.FileNameSuffix) {
 			// 分割取 . 前面的 如 1351.data 取 1351
 			splitNames := strings.Split(entry.Name(), ".")
 			fileId, err := strconv.Atoi(splitNames[0])
