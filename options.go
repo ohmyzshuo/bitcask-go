@@ -7,7 +7,7 @@ type Options struct {
 	// 數據文件的大小
 	DataFileSize int64
 
-	//每次寫數據是否持久化
+	// 每次寫數據是否持久化
 	SyncWrites bool
 
 	// 索引類型

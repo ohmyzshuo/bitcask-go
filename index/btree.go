@@ -22,6 +22,9 @@ func NewBTree() *BTree {
 func (bt *BTree) Put(key []byte, pos *data.LogRecordPos) bool {
 	it := &Item{key, pos}
 	bt.lock.Lock()
+
+	// 如果 key 不存在直接插入
+	// 如果 key 存在，則用新的 pos 替換舊的 pos
 	bt.tree.ReplaceOrInsert(it)
 	bt.lock.Unlock()
 	return true
@@ -34,6 +37,8 @@ func (bt *BTree) Get(key []byte) *data.LogRecordPos {
 	if btreeItem == nil {
 		return nil
 	}
+
+	// btreeItem 是 Item 接口類型，因此要強制轉換
 	return btreeItem.(*Item).pos
 }
 
@@ -44,6 +49,8 @@ func (bt *BTree) Delete(key []byte) bool {
 	bt.lock.Lock()
 	oldItem := bt.tree.Delete(it) // 右側返回的是刪除的那個值
 	bt.lock.Unlock()
+
+	// 刪除的 item 為空，則刪除失敗
 	if oldItem == nil {
 		return false
 	}
