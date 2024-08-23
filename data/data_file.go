@@ -46,8 +46,8 @@ func (df *DataFile) ReadLogRecord(offset int64) (*LogRecord, int64, error) {
 		return nil, 0, err
 	}
 	// 如果讀取的最大 header 長度已經超過了文件的長度，則只需要讀取到文件的末尾即可
-	var headerBytes int64 = maxLogRecordHeaderSize
-	if offset+maxLogRecordHeaderSize > fileSize {
+	var headerBytes int64 = maxHeaderSize
+	if offset+maxHeaderSize > fileSize {
 		headerBytes = fileSize - offset
 	}
 
