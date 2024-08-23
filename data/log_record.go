@@ -14,7 +14,7 @@ const (
 
 // CRC type keySize valueSize
 // 4 + 1  + 5   +   5        = 15
-const maxLogRecordHeaderSize = binary.MaxVarintLen32*2 + 4 + 1
+const maxHeaderSize = binary.MaxVarintLen32*2 + 4 + 1
 
 // LogRecord 寫入到數據文件的記錄
 // 因為數據文件中的數據是追加寫入的，類似日誌，所以命名為日誌
@@ -41,7 +41,7 @@ type LogRecordPos struct {
 // EncodeLogRecord 對 LogRecord 進行編碼，返回字節數組及其長度
 func EncodeLogRecord(record *LogRecord) ([]byte, int64) {
 	// 初始化一個 header 部分的字節數組
-	header := make([]byte, maxLogRecordHeaderSize)
+	header := make([]byte, maxHeaderSize)
 
 	// 在第五個字節儲存 Type
 	header[4] = record.Type
